@@ -3,38 +3,42 @@
 #include <string.h>
 #include <stdbool.h>
 #include <stdint.h>
+#include <getopt.h>
+#include <assert.h>
 
 #define HAND_SIZE 5
+#define NUM_PLAYERS 2
 #define MAX_TURNS 10
 
 
-
+// Represent's both of a player's hands
 typedef struct _player {
-    uint8_t left;
-    uint8_t right;
+    uint8_t left: 4;
+    uint8_t right: 4;
 } player;
 
-bool isLeftHandOut(player p) {
-    return !p.left;
-}
-
-bool isRightHandOut(player p) {
-    return !p.right;
-}
-
+// Returns true if the player has zero for both hands
 bool isOut(player p) {
-    return isLeftHandOut(p) && isRightHandOut(p);
+    return !p.left && !p.right;
 }
 
+// Counts how many branches have been terminated and therefore computed
 long count = 0;
-int shortestGame = MAX_TURNS;
-player shortestGameHistory[2][MAX_TURNS+1];
 
-void advance(player h[2][MAX_TURNS+1], player a, player b, int turns) {
+// Keeps track of the number of turns in the shortest game
+int shortestGame = MAX_TURNS;
+
+// Keeps track of the hands
+player shortestGameHistory[NUM_PLAYERS][MAX_TURNS+1];
+
+
+// Recursive function, computes all branch moves possible for A on B
+void advance(player h[NUM_PLAYERS][MAX_TURNS+1], player a, player b, int turns) {
 
     // Variables for storing
-    int A = (turns % 2) ? (1) : (0);
-    int B = (turns % 2) ? (0) : (1);
+	assert(NUM_PLAYERS == 2);
+    int A = (turns % NUM_PLAYERS) ? (1) : (0);
+    int B = (turns % NUM_PLAYERS) ? (0) : (1);
 
     // Cut turns off if it reaches max
     if (turns >= MAX_TURNS) {
@@ -52,9 +56,9 @@ void advance(player h[2][MAX_TURNS+1], player a, player b, int turns) {
     // Check previous hands for a match
     for (int i = 0; i < turns; i++) {
         if (
-            (h[0][i].left == h[A][turns].left) && 
+            (h[0][i].left == h[A][turns].left) &&
             (h[0][i].right == h[A][turns].right) &&
-            (h[1][i].left == h[B][turns].left) && 
+            (h[1][i].left == h[B][turns].left) &&
             (h[1][i].right == h[B][turns].right)) {
                 // we have a match
             printf("Found circular game, ending early at turn %d\n", turns);
@@ -89,7 +93,7 @@ void advance(player h[2][MAX_TURNS+1], player a, player b, int turns) {
     // A takes a turn
     turns++;
 
-    // Try L-L
+    // Try Left-tap-Left
     if (a.left && b.left) {
         b.left += a.left;    // Modify
         // Store history
@@ -99,7 +103,7 @@ void advance(player h[2][MAX_TURNS+1], player a, player b, int turns) {
         b.left -= a.left;    // Restore
     }
 
-    // Try L-R
+    // Try Left-tap-Right
     if (a.left && b.right) {
         b.right += a.left;   // Modify
         // Store history
@@ -109,7 +113,7 @@ void advance(player h[2][MAX_TURNS+1], player a, player b, int turns) {
         b.right -= a.left;   // Restore
     }
 
-    // Try R-L
+    // Try Right-tap-Left
     if (a.right && b.left) {
         b.left += a.right;    // Modify
         // Store history
@@ -119,7 +123,7 @@ void advance(player h[2][MAX_TURNS+1], player a, player b, int turns) {
         b.left -= a.right;    // Restore
     }
 
-    // Try R-R
+    // Try Right-tap-Right
     if (a.right && b.right) {
         b.right += a.right;   // Modify
         // Store history
@@ -129,7 +133,7 @@ void advance(player h[2][MAX_TURNS+1], player a, player b, int turns) {
         b.right -= a.right;   // Restore
     }
 
-    // Try all possible right shift (L->R)
+    // Try all possible right shift (move fingers from left to right)
     if (a.left) {
         //for (int i = 1; i <= a.left; i++) {
         for (int i = 1; i < a.left; i++) {
@@ -143,14 +147,14 @@ void advance(player h[2][MAX_TURNS+1], player a, player b, int turns) {
                 // Store history
                 h[A][turns] = a;
                 h[B][turns] = b;
-                advance(h, b, a, turns);   // Recurse 
+                advance(h, b, a, turns);   // Recurse
                 a.left += i;    // Restore
                 a.right -= i;
             }
         }
     }
 
-    // Try all possible left shift (R->L)
+    // Try all possible left shift (move fingers from right to left)
     if (a.right) {
         //for (int i = 1; i <= a.right; i++) {
         for (int i = 1; i < a.right; i++) {
@@ -164,20 +168,22 @@ void advance(player h[2][MAX_TURNS+1], player a, player b, int turns) {
                 // Store history
                 h[A][turns] = a;
                 h[B][turns] = b;
-                advance(h, b, a, turns);   // Recurse 
+                advance(h, b, a, turns);   // Recurse
                 a.right += i;    // Restore
                 a.left -= i;
             }
         }
     }
 
-   
+
 }
 
 int main() {
-    // Create history
-    player history[2][MAX_TURNS+1];
 
+    // 0 is first turn, 1-10 is ith turn so MAX + 1 items
+    player history[NUM_PLAYERS][MAX_TURNS+1];
+
+	// Start off both players at (1,1)
     player human;
     player cpu;
     human.left = 1;
@@ -185,18 +191,18 @@ int main() {
     cpu.left = 1;
     cpu.right = 1;
 
-    // Store history
+    // Store starting value as turn 0
     history[0][0] = human;
     history[1][0] = cpu;
 
     advance(history, human, cpu, 0);
 
-    printf("\n\nTotal branches: %d\n\n", count);
+    printf("\n\nTotal branches: %ld\n\n", count);
 
     printf("Shortest game: %d moves\n", shortestGame);
     // Print history
-        for (int i = 0; i <= shortestGame; i++) {
-            // Print a turn
-            printf("Turn %d: (%d, %d) - (%d, %d)\n", i, shortestGameHistory[0][i].left, shortestGameHistory[0][i].right, shortestGameHistory[1][i].left, shortestGameHistory[1][i].right);
-        }
+    for (int i = 0; i <= shortestGame; i++) {
+        // Print a turn
+        printf("Turn %d: (%d, %d) - (%d, %d)\n", i, shortestGameHistory[0][i].left, shortestGameHistory[0][i].right, shortestGameHistory[1][i].left, shortestGameHistory[1][i].right);
+    }
 }
